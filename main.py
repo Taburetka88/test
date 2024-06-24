@@ -1,21 +1,29 @@
-from typing import Annotated
+from fastapi import FastAPI, Request
+import requests
+from bot import bot, API_TOKEN, dp 
+from aiogram import types
+import uvicorn
 
-from fastapi import FastAPI, Path
-from pydantic import BaseModel
-import bot
-import asyncio
 app = FastAPI()
 
+@app.on_event("startup") 
+async def on_startup(): 
+    webhook_url = 'https://25fb-5-130-33-200.ngrok-free.app'
+    telegram_api_url = f'https://api.telegram.org/bot{API_TOKEN}/setWebhook'
+    response = requests.post(telegram_api_url, data={"url": webhook_url}) 
+    print(response.json())
 
-class Tg_message(BaseModel):
-    tg_id: int
-    message: str 
-
-
+@app.on_event("shutdown")
+async def on_shutdown():
+     telegram_api_url = f'https://api.telegram.org/bot{API_TOKEN}/deleteWebhook' 
+     response = requests.post(telegram_api_url)
+     print(response.json())
 @app.post("/")
-async def send_massage(message: Tg_message):
-    await bot.bot.send_message(message.tg_id, message.message)
-    return 200
-@app.on_event("startup")
-async def on_sturtup():
-    asyncio.create_task(bot.start_bot())
+async def webhook(request: Request):
+    json_data = await request.json() 
+    update = types.Update(**json_data) 
+    await dp.feed_update(bot = bot,update = update)
+if __name__ == '__main__':
+    uvicorn.run(app,host = '0.0.0.0', port = 8000)
+
+
